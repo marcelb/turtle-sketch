@@ -1,0 +1,79 @@
+name: release
+
+on:
+  release:
+    types: [published]
+
+concurrency:
+  group: release
+  cancel-in-progress: true
+
+permissions:
+  contents: write # push the version-bump commits back to main
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history: we push commits back to main
+          ref: ${{ github.event.release.tag_name }} # build the tagged commit
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push release image
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -e
+          VER="${TAG#v}"
+          echo "$VER" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "release tag must be vX.Y.Z, got '$TAG'"; exit 1; }
+          # bake the release version into the image (client bundle reads it from package.json);
+          # uncommitted — the tagged commit's package.json still has the old version
+          npm version --no-git-tag-version "$VER"
+          ARGS="--build-arg APP_VERSION=$VER --build-arg VCS_REF=$GITHUB_SHA"
+          for t in "$TAG" latest; do ARGS="$ARGS -t $IMAGE:$t"; done
+          DOCKER_BUILDKIT=1 docker build $ARGS .
+          for t in "$TAG" latest; do docker push "$IMAGE:$t"; done
+          echo "SMOKE_IMAGE=$IMAGE:$TAG" >> "$GITHUB_ENV"
+
+      - name: Smoke test the release image
+        run: |
+          set -e
+          # publish on localhost, so the app is reachable on 127.0.0.1:3000
+          docker run -d --name ts-smoke -p 127.0.0.1:3000:3000 -e DATA_DIR=/tmp/ts-smoke "$SMOKE_IMAGE"
+          trap 'docker rm -f ts-smoke >/dev/null 2>&1 || true' EXIT
+          ok=0
+          for i in $(seq 1 30); do
+            if node -e "fetch('http://127.0.0.1:3000/health').then(r=>r.json()).then(j=>{if(j.status!=='ok')process.exit(1);console.log('/health ok, version '+j.version)}).catch(()=>process.exit(1))"; then
+              ok=1; break
+            fi
+            sleep 1
+          done
+          if [ "$ok" != 1 ]; then echo 'smoke test failed'; docker logs ts-smoke; exit 1; fi
+
+      - name: Bump package.json on main to release version, then snapshot
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -e
+          git config user.name "turtle-sketch-ci"
+          git config user.email "ci@localhost"
+          git checkout -f main # discard the uncommitted version bump from the build step
+          VER="${TAG#v}"
+          npm version --no-git-tag-version "$VER"
+          git add package.json
+          git commit -m "chore(release): $TAG [skip ci]"
+          git push origin main
+          npm version --no-git-tag-version "$VER-snapshot"
+          git add package.json
+          git commit -m "chore: bump to v$VER-snapshot"
+          git push origin main

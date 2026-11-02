@@ -1,0 +1,75 @@
+name: docker
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to ghcr.io
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}
+        run: |
+          set -e
+          VER=$(node -p "require('./package.json').version")
+          SHA7=${GITHUB_SHA::7}
+          # every build gets version+commit (unique per commit); main also floats 'snapshot'.
+          # Releases (vX.Y.Z + latest) are cut by the manual 'release' workflow, not by tags.
+          TAGS="v$VER-$SHA7"
+          if [ "$GITHUB_REF" = "refs/heads/main" ]; then TAGS="$TAGS snapshot"; fi
+          ARGS="--build-arg APP_VERSION=$VER --build-arg VCS_REF=$GITHUB_SHA"
+          for t in $TAGS; do ARGS="$ARGS -t $IMAGE:$t"; done
+          DOCKER_BUILDKIT=1 docker build $ARGS .
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            for t in $TAGS; do docker push "$IMAGE:$t"; done
+          fi
+          echo "SMOKE_IMAGE=$IMAGE:v$VER-$SHA7" >> "$GITHUB_ENV"
+
+      - name: Smoke test the image
+        run: |
+          set -e
+          # publish on localhost, so the app is reachable on 127.0.0.1:3000
+          docker run -d --name ts-smoke -p 127.0.0.1:3000:3000 -e DATA_DIR=/tmp/ts-smoke "$SMOKE_IMAGE"
+          trap 'docker rm -f ts-smoke >/dev/null 2>&1 || true' EXIT
+          ok=0
+          for i in $(seq 1 30); do
+            if node -e "fetch('http://127.0.0.1:3000/health').then(r=>r.json()).then(j=>{if(j.status!=='ok')process.exit(1);console.log('/health ok, version '+j.version)}).catch(()=>process.exit(1))"; then
+              ok=1; break
+            fi
+            sleep 1
+          done
+          if [ "$ok" != 1 ]; then echo 'smoke test failed'; docker logs ts-smoke; exit 1; fi
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+        env:
+          CHROME_PATH: /usr/bin/google-chrome

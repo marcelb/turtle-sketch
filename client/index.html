@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+  <title>Turtle Sketch</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; overflow: hidden; font-family: system-ui, sans-serif; }
+
+    /* top-left room title */
+    #title {
+      position: fixed; top: 12px; left: 62px; z-index: 10; max-width: 42vw;
+      font-size: 14px; font-weight: 600; color: #3f4450; padding: 4px 8px; border-radius: 7px;
+      border: 1px solid transparent; cursor: text; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    #title:hover { background: #fff; border-color: #e2e4ea; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+    #title-input {
+      position: fixed; top: 10px; left: 60px; z-index: 11; width: 340px; max-width: 42vw;
+      font: 600 14px system-ui, sans-serif; color: #1a1a1a; padding: 5px 8px;
+      border: 1px solid #4a6cf7; border-radius: 7px; outline: none; background: #fff;
+      box-shadow: 0 2px 8px rgba(0,0,0,.12);
+    }
+
+    /* dashboard at the root URL (no hash) */
+    #dashboard {
+      position: fixed; inset: 0; z-index: 50; display: none; overflow: auto;
+      background: #fafafb; padding: 40px 24px;
+    }
+    .dash-inner { max-width: 640px; margin: 0 auto; }
+    .dash-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+    .dash-brand { display: flex; align-items: center; gap: 10px; }
+    .dash-logo { width: 88px; height: 88px; display: block; }
+    .dash-head h1 { font-size: 20px; margin: 0; color: #1a1a1a; }
+    #dash-new {
+      background: #4a6cf7; color: #fff; border: none; border-radius: 8px;
+      padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+    #dash-new:hover { background: #3b5bdb; }
+    .dash-actions { display: flex; gap: 8px; align-items: center; }
+    #dash-home {
+      background: #fff; color: #3f4450; border: 1px solid #e2e4ea; border-radius: 8px;
+      padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    }
+    #dash-home:hover { background: #f0f1f5; }
+    #dash-title.editable { cursor: text; border-radius: 6px; padding: 2px 6px; margin-left: -6px; }
+    #dash-title.editable:hover { color: #4a6cf7; background: #fff; }
+    .room-row {
+      display: flex; align-items: center; gap: 12px; background: #fff;
+      border: 1px solid #e4e4e9; border-radius: 9px; padding: 10px 14px; margin-bottom: 8px;
+    }
+    .room-name { flex: 1; font-size: 14px; font-weight: 600; color: #1a1a1a; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .room-name:hover { color: #4a6cf7; }
+    .room-time { font-size: 11px; color: #9aa0ad; white-space: nowrap; }
+    .room-del {
+      background: transparent; color: #e5534b; border: 1px solid #f0c9c7; border-radius: 6px;
+      padding: 4px 10px; font-size: 12px; cursor: pointer;
+    }
+    .room-del:hover { background: #fdeceb; }
+    .room-ren {
+      background: transparent; color: #3f4450; border: 1px solid #e2e4ea; border-radius: 6px;
+      padding: 4px 10px; font-size: 12px; cursor: pointer;
+    }
+    .room-ren:hover { background: #f0f1f5; }
+    .rename-input {
+      font: 600 14px system-ui, sans-serif; color: #1a1a1a; padding: 4px 8px;
+      border: 1px solid #4a6cf7; border-radius: 7px; outline: none; background: #fff;
+      box-shadow: 0 2px 8px rgba(0,0,0,.12); width: 260px; max-width: 40vw;
+    }
+    h1.rename-input.rename-title { font-size: 20px; width: 340px; max-width: 42vw; padding: 2px 8px; }
+    .dash-empty { color: #9aa0ad; font-size: 13px; padding: 12px 2px; }
+    #dash-list { max-height: calc(100vh - 130px); overflow-y: auto; padding-right: 4px; }
+    #dash-version { position: fixed; right: 10px; bottom: 8px; font-size: 11px; color: #9aa0ad; }
+
+    /* in-page confirm dialog (delete board/workspace) */
+    #confirm-dialog {
+      border: 1px solid #e2e4e9; border-radius: 10px; padding: 18px 20px; max-width: 400px;
+      box-shadow: 0 8px 30px rgba(0,0,0,.18); font-family: system-ui, sans-serif;
+    }
+    #confirm-dialog::backdrop { background: rgba(20,22,30,.35); }
+    #confirm-dialog p { margin: 0 0 16px; font-size: 14px; color: #1a1a1a; }
+    .confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
+    #confirm-cancel {
+      background: #fff; color: #3f4450; border: 1px solid #e2e4ea; border-radius: 6px;
+      padding: 6px 14px; font-size: 13px; cursor: pointer;
+    }
+    #confirm-cancel:hover { background: #f0f1f5; }
+    #confirm-ok {
+      background: #e5534b; color: #fff; border: none; border-radius: 6px;
+      padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+    #confirm-ok:hover { background: #d43f37; }
+
+    /* left tool sidebar */
+    #tools {
+      position: fixed; top: 8px; left: 8px; bottom: 8px; width: 44px; z-index: 10;
+      display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0;
+      background: #191b22; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,.25);
+    }
+    #tools button {
+      width: 34px; height: 34px; display: grid; place-items: center; padding: 0;
+      background: transparent; color: #c8ccd6; border: none; border-radius: 8px; cursor: pointer;
+    }
+    #tools button:hover { background: #262936; }
+    #tools button.active { background: #4a6cf7; color: #fff; }
+    #tools button svg { width: 19px; height: 19px; }
+    #tools .sep { width: 22px; height: 1px; background: #333747; margin: 4px 0; }
+    #tools .spacer { flex: 1; }
+
+    /* top right: users + name + status */
+    #topright {
+      position: fixed; top: 10px; right: 10px; z-index: 10;
+      display: flex; align-items: center; gap: 8px;
+    }
+    #users { display: flex; flex-direction: row-reverse; }
+    #users .avatar {
+      width: 28px; height: 28px; border-radius: 50%; border: 2px solid #fff;
+      color: #fff; font-size: 12px; font-weight: 600; display: grid; place-items: center;
+      margin-left: -8px; box-shadow: 0 1px 3px rgba(0,0,0,.25); user-select: none;
+    }
+    #name {
+      background: #fff; color: #1a1a1a; border: 1px solid #e2e4ea; border-radius: 8px;
+      padding: 6px 9px; font-size: 12px; width: 120px; box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    }
+    #dash-btn {
+      background: #fff; border: 1px solid #e2e4ea; border-radius: 8px;
+      width: 30px; height: 30px; display: grid; place-items: center; cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08); padding: 0;
+    }
+    #dash-btn:hover { background: #f0f1f5; }
+    #dash-btn img { width: 18px; height: 18px; display: block; }
+    #dl-btn {
+      background: #fff; color: #3f4450; border: 1px solid #e2e4ea; border-radius: 8px;
+      width: 30px; height: 30px; display: grid; place-items: center; cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08); padding: 0;
+    }
+    #dl-btn:hover { background: #f0f1f5; }
+    #dl-btn svg { width: 15px; height: 15px; }
+    #status { width: 9px; height: 9px; border-radius: 50%; background: #e5534b; }
+    #status.on { background: #57ab5a; }
+
+    /* bottom right: zoom + room link */
+    #hint {
+      position: fixed; right: 10px; bottom: 8px; z-index: 10; display: flex; gap: 10px; align-items: center;
+      font-size: 11px; color: #9aa0ad; background: rgba(255,255,255,.8); padding: 4px 8px; border-radius: 6px;
+    }
+
+    /* canvas with dot grid (grid offset is synced to the viewport in JS) */
+    #board {
+      position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: default;
+      background-color: #fafafb;
+      background-image: radial-gradient(circle, #d9dbe2 1.2px, transparent 1.2px);
+      background-size: 24px 24px;
+    }
+    #board.panning, #board.hand { cursor: grab; }
+    #board, #board * { user-select: none; -webkit-user-select: none; }
+    #board text { pointer-events: none; white-space: pre; }
+    #overlay { pointer-events: none; }
+    .marquee { fill: rgba(74,108,247,.12); stroke: #4a6cf7; stroke-width: 1; }
+    .preview { fill: rgba(255,255,255,.9); stroke: #4a6cf7; stroke-width: 1.5; stroke-dasharray: 4 3; }
+    .arrow-preview { fill: none; stroke: #444; stroke-width: 2; marker-end: url(#arrow); }
+    .sel-box { fill: none; stroke: #4a6cf7; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+    .sel-handle { fill: #fff; stroke: #4a6cf7; stroke-width: 1.5; vector-effect: non-scaling-stroke; cursor: nwse-resize; }
+    .wb-edit-fo { overflow: visible; }
+    .wb-editing { box-sizing: border-box; caret-color: #4a6cf7; }
+    /* connector label editor: opaque input field so the arrow line and knobs don't show through */
+    .wb-edit-fo.conn .wb-edit-wrap { background: #ffffff; border-radius: 6px; outline: 1px solid #4a6cf7; }
+
+    /* floating format bar above the selection */
+    #fmtbar {
+      position: fixed; z-index: 30; display: none; align-items: center; gap: 2px; padding: 4px 6px;
+      background: #fff; border: 1px solid #e4e4e9; border-radius: 9px; box-shadow: 0 4px 16px rgba(0,0,0,.14);
+    }
+    #fmtbar button {
+      min-width: 26px; height: 26px; display: grid; place-items: center; padding: 0 4px;
+      background: transparent; color: #3f4450; border: none; border-radius: 6px; cursor: pointer; font-size: 12px;
+    }
+    #fmtbar button:hover { background: #f0f1f5; }
+    #fmtbar button.active { background: #e3e9ff; color: #4a6cf7; }
+    #fmtbar button svg { width: 15px; height: 15px; }
+    #fmtbar .sep { width: 1px; height: 18px; background: #e4e4e9; margin: 0 3px; }
+    #fb-size { font-size: 12px; color: #3f4450; min-width: 20px; text-align: center; }
+    .fb-swatch { position: relative; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 6px; }
+    .fb-swatch:hover { background: #f0f1f5; }
+    .fb-swatch-btn { position: relative; min-width: 26px; height: 26px; display: grid; place-items: center; padding: 0 4px; background: transparent; color: #3f4450; border: none; cursor: pointer; }
+    .fb-swatch-btn svg { width: 15px; height: 15px; }
+    .fb-swatch-bar { position: absolute; left: 5px; right: 5px; bottom: 3px; height: 3px; border-radius: 2px; background: #1a1a1a; pointer-events: none; }
+    .fb-swatch-input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; pointer-events: none; padding: 0; border: none; }
+    #colorpop { position: fixed; z-index: 60; background: #fff; border: 1px solid #e2e4ea; border-radius: 10px; box-shadow: 0 4px 16px rgba(0,0,0,.14); padding: 8px; width: 184px; }
+    #colorpop-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px; }
+    #colorpop-grid button { width: 15px; height: 15px; border-radius: 4px; border: 1px solid rgba(0,0,0,.18); cursor: pointer; padding: 0; }
+    #colorpop-grid button:hover { transform: scale(1.15); }
+    #colorpop-custom { margin-top: 8px; width: 100%; font: 600 12px system-ui, sans-serif; color: #3f4450; background: #f0f1f5; border: none; border-radius: 6px; padding: 5px 0; cursor: pointer; }
+    #colorpop-custom:hover { background: #e3e9ff; color: #4a6cf7; }
+    #fb-fill-none, #fb-stroke-none { min-width: 26px; height: 26px; display: grid; place-items: center; padding: 0 4px; background: transparent; color: #3f4450; border: none; border-radius: 6px; cursor: pointer; }
+    #fb-fill-none:hover, #fb-stroke-none:hover { background: #f0f1f5; }
+    #fb-fill-none.active, #fb-stroke-none.active { background: #e3e9ff; color: #4a6cf7; }
+    #fb-fill-none svg, #fb-stroke-none svg { width: 15px; height: 15px; }
+  </style>
+</head>
+<body>
+  <div id="dashboard">
+    <div class="dash-inner">
+      <div class="dash-head"><div class="dash-brand"><img class="dash-logo" src="/logo.svg" alt="Turtle Sketch logo" /><h1 id="dash-title">Turtle Sketch</h1></div><div class="dash-actions"><button id="dash-home" style="display:none" title="Back to all workspaces">‹ Workspaces</button><button id="dash-new">+ New</button></div></div>
+      <div id="dash-list"></div>
+    </div>
+    <span id="dash-version"></span>
+  </div>
+  <dialog id="confirm-dialog">
+    <p id="confirm-text"></p>
+    <div class="confirm-actions"><button id="confirm-cancel">Cancel</button><button id="confirm-ok">Delete</button></div>
+  </dialog>
+  <div id="title" title="Click to rename"></div>
+  <div id="tools">
+    <button data-tool="select" title="Select (V)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 8-6.5 1.5L9 19z"/></svg></button>
+    <button data-tool="hand" title="Pan (H)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0v5M14 10V4a2 2 0 0 0-4 0v6M10 10.5V6a2 2 0 0 0-4 0v8M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg></button>
+    <span class="sep"></span>
+    <button data-tool="rect" title="Rectangle (R)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="6" width="16" height="12" rx="1.5"/></svg></button>
+    <button data-tool="ellipse" title="Ellipse (E)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/></svg></button>
+    <button data-tool="diamond" title="Diamond (D)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 4l8 8-8 8-8-8z"/></svg></button>
+    <button data-tool="text" title="Text (T)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 7V5h14v2M12 5v14m-3 0h6"/></svg></button>
+    <button data-tool="arrow" title="Arrow (A)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20L20 4M20 4h-7m7 0v7"/></svg></button>
+    <button data-tool="elbow" title="Elbow arrow (B)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h9V6h7M16.5 3.5L20 6l-3.5 2.5"/></svg></button>
+    <button data-tool="frame" title="Frame (F)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="2.6" stroke-dasharray="2 2"/><path d="M7 8h7" stroke-linecap="round"/></svg></button>
+    <span class="spacer"></span>
+    <button id="undo" title="Undo (Ctrl+Z)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3"/></svg></button>
+    <button id="redo" title="Redo (Ctrl+Shift+Z)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5M20 9H10a6 6 0 0 0 0 12h3"/></svg></button>
+  </div>
+
+  <div id="topright">
+    <span id="status" title="connection"></span>
+    <div id="users"></div>
+    <input id="name" title="Your name" maxlength="30" />
+    <button id="dl-btn" title="Download the whiteboard as SVG"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0l-4-4m4 4l4-4M5 20h14"/></svg></button>
+    <button id="dash-btn" title="Back to the home dashboard"><img src="/logo.svg" alt="Home" /></button>
+  </div>
+
+  <div id="colorpop" style="display:none">
+    <div id="colorpop-grid"></div>
+    <button id="colorpop-custom" title="Custom color">Custom…</button>
+  </div>
+
+  <svg id="board">
+    <defs>
+      <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="context-stroke"></path>
+      </marker>
+    </defs>
+  </svg>
+
+  <div id="fmtbar">
+    <span id="textctl" style="display:contents">
+    <button data-k="fontSize" data-d="-2" title="Smaller text">−</button>
+    <span id="fb-size">16</span>
+    <button data-k="fontSize" data-d="2" title="Bigger text">+</button>
+    <span class="sep"></span>
+    <button data-k="bold" data-v="toggle" title="Bold"><b>B</b></button>
+    <button data-k="italic" data-v="toggle" title="Italic"><span style="font-family:Georgia,'Times New Roman',serif;font-style:italic;font-weight:700">I</span></button>
+    <span class="fb-swatch" id="fb-color-wrap" title="Text color">
+      <button id="fb-color-btn" class="fb-swatch-btn" tabindex="-1"><span style="font-weight:700;font-size:13px;line-height:1">A</span><span id="fb-color-bar" class="fb-swatch-bar"></span></button>
+      <input type="color" id="fb-color-input" class="fb-swatch-input" />
+    </span>
+    <span class="sep"></span>
+    <button data-k="align" data-v="left" title="Align left"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h10M4 18h13"/></svg></button>
+    <button data-k="align" data-v="center" title="Align center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M7 12h10M5 18h14"/></svg></button>
+    <button data-k="align" data-v="right" title="Align right"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M10 12h10M7 18h13"/></svg></button>
+    <span class="sep"></span>
+    <button data-k="valign" data-v="top" title="Align top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect style="stroke-width:1.62574" width="18.30748" height="0.62862408" x="2.8271825" y="4.3152585" ry="0.2" /><rect id="rect3" width="4.8966613" height="7.4403815" x="4.45151" y="8.3179646" ry="0.2" rx="0.2" /><rect width="5.8378377" height="10.798092" x="13.011127" y="8.2289352" rx="0.2" ry="0.2" /></svg></button>
+    <button data-k="valign" data-v="middle" title="Align middle"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2" viewBox="0 0 24 24"><rect width="4.897" height="7.44" x="4.362" y="7.911" rx=".2" ry=".2"/><rect width="5.838" height="10.798" x="13.049" y="6.073" rx=".2" ry=".2"/></svg></button>
+    <button data-k="valign" data-v="bottom" title="Align bottom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2" viewBox="0 0 24 24"><rect width="18.307" height=".629" x="2.586" y="19.145" rx=".2" ry=".2" style="stroke-width:1.62574"/><rect width="4.897" height="7.44" x="4.452" y="8.318" rx=".2" ry=".2"/><rect width="5.838" height="10.798" x="13.024" y="5.017" rx=".2" ry=".2"></svg></button>
+    <span class="sep"></span>
+    </span>
+    <span id="stylectl" style="display:contents">
+      <span class="fb-swatch" id="fb-fill-wrap" title="Fill color">
+        <button id="fb-fill-btn" class="fb-swatch-btn" tabindex="-1"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg><span id="fb-fill-bar" class="fb-swatch-bar"></span></button>
+        <input type="color" id="fb-fill-input" class="fb-swatch-input" />
+      </span>
+      <button id="fb-fill-none" title="No fill (transparent)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="5" y="5" width="14" height="14" rx="2"/><path d="M6 18L18 6" stroke="#e5534b" stroke-width="3"/></svg></button>
+      <span class="fb-swatch" id="fb-stroke-wrap" title="Border color">
+        <button id="fb-stroke-btn" class="fb-swatch-btn" tabindex="-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="5" width="14" height="14" rx="2"/></svg><span id="fb-stroke-bar" class="fb-swatch-bar"></span></button>
+        <input type="color" id="fb-stroke-input" class="fb-swatch-input" />
+      </span>
+      <span class="sep"></span>
+      <button id="fb-stroke-none" title="No border"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="5" y="5" width="14" height="14" rx="2"/><path d="M6 18L18 6"/></svg></button>
+      <button data-k="width" data-v="1" title="Thin border"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="1" stroke-linecap="round"><path d="M3 12h18"/></svg></button>
+      <button data-k="width" data-v="2" title="Medium border"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M3 12h18"/></svg></button>
+      <button data-k="width" data-v="4" title="Thick border"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"><path d="M3 12h18"/></svg></button>
+      <span class="sep"></span>
+    </span>
+    <span id="connctl" style="display:none">
+      <span class="fb-swatch" id="fb-conn-color-wrap" title="Arrow color">
+        <button id="fb-conn-color-btn" class="fb-swatch-btn" tabindex="-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20L20 4M20 4h-7m7 0v7"/></svg><span id="fb-conn-color-bar" class="fb-swatch-bar"></span></button>
+        <input type="color" id="fb-conn-color-input" class="fb-swatch-input" />
+      </span>
+      <span class="sep"></span>
+      <button data-k="dash" data-v="toggle" title="Dotted line"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h4m4 0h4m4 0h4"/></svg></button>
+      <span class="sep"></span>
+      <button data-k="width" data-v="1" title="Thin"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="1" stroke-linecap="round"><path d="M3 12h18"/></svg></button>
+      <button data-k="width" data-v="2" title="Medium"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M3 12h18"/></svg></button>
+      <button data-k="width" data-v="4" title="Thick"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"><path d="M3 12h18"/></svg></button>
+      <span class="sep"></span>
+      <button data-k="arrowStart" data-v="toggle" title="Arrowhead at start"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6l-5 6 5 6M3 12h18"/></svg></button>
+      <button data-k="arrowEnd" data-v="toggle" title="Arrowhead at end"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 6l5 6-5 6M21 12H3"/></svg></button>
+      <span class="sep"></span>
+      <button data-k="elbow" data-v="toggle" title="Elbow (90°) path"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h9V6h7M16.5 3.5L20 6l-3.5 2.5"/></svg></button>
+    </span>
+    <span id="groupctl" style="display:none">
+      <button id="fb-group" title="Group selection (Ctrl+G)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="12" height="12" rx="2"/><rect x="9" y="9" width="12" height="12" rx="2"/></svg></button>
+      <button id="fb-ungroup" title="Ungroup (Ctrl+Shift+G)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4"/></svg></button>
+    </span>
+    <span id="multictl" style="display:none">
+      <button data-act="spaceH" title="Space evenly horizontally (gap between the two leftmost applied to all)"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="2" y="8" width="4" height="8" rx="1"/><rect x="10" y="8" width="4" height="8" rx="1"/><rect x="18" y="8" width="4" height="8" rx="1"/><path d="M6 12h1.5M16.5 12H18" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></button>
+      <button data-act="spaceV" title="Space evenly vertically (gap between the two topmost applied to all)"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="8" y="2" width="8" height="4" rx="1"/><rect x="8" y="10" width="8" height="4" rx="1"/><rect x="8" y="18" width="8" height="4" rx="1"/><path d="M12 6v1.5M12 16.5V18" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></button>
+      <span class="sep"></span>
+      <button data-act="alignTop" title="Align top edges to the highest top edge"><svg viewBox="0 0 24 24"><path d="M3 5h18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/><rect x="5" y="5" width="4" height="10" rx="1" fill="currentColor"/><rect x="15" y="5" width="4" height="6" rx="1" fill="currentColor"/></svg></button>
+      <button data-act="alignBottom" title="Align bottom edges to the lowest bottom edge"><svg viewBox="0 0 24 24"><path d="M3 19h18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/><rect x="5" y="9" width="4" height="10" rx="1" fill="currentColor"/><rect x="15" y="13" width="4" height="6" rx="1" fill="currentColor"/></svg></button>
+    </span>
+    <span id="zctl" style="display:contents">
+      <span class="sep"></span>
+      <button data-k="z" data-v="top" title="Bring to front"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14M12 20V8m-5 5l5-5 5 5"/></svg></button>
+      <button data-k="z" data-v="up" title="Bring forward"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V5m-5 5l5-5 5 5"/></svg></button>
+      <button data-k="z" data-v="down" title="Send backward"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v15m-5-5l5 5 5-5"/></svg></button>
+      <button data-k="z" data-v="bottom" title="Send to back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20h14M12 4v12m-5-5l5 5 5-5"/></svg></button>
+    </span>
+    <span class="sep"></span>
+    <button id="fb-delete" title="Delete (Del)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13M10 11v5m4-5v5"/></svg></button>
+  </div>
+
+  <div id="hint"><span id="zoom">100%</span><span id="roomlink"></span><span id="version"></span></div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
