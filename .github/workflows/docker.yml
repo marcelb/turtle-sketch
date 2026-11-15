@@ -17,11 +17,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Log in to ghcr.io
         if: github.event_name == 'push'
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -63,13 +63,15 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    # same base as the Forgejo build container: pinned Debian chromium, so the
+    # pixel-sensitive text tests see the same browser/fonts as on Forgejo
+    container:
+      image: node:22-bookworm
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
+      - uses: actions/checkout@v6
+      - name: Install chromium
+        run: apt-get update && apt-get install -y --no-install-recommends chromium && rm -rf /var/lib/apt/lists/*
       - run: npm ci
       - run: npm test
         env:
-          CHROME_PATH: /usr/bin/google-chrome
+          CHROME_PATH: /usr/bin/chromium
