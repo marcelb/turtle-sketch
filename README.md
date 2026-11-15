@@ -1,4 +1,4 @@
-# turtle-sketch
+# Turtle Sketch
 
 Collaborative whiteboard in the browser. No accounts, no authentication or authorization. Just share the link, give it any name. 
 Vector shapes on an infinite canvas, arrow/line connectors that attach to shapes and stuff. Dockerized and ready to go.
