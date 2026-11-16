@@ -238,7 +238,12 @@ test('text: partial color applies to the selection, whole-text color overwrites 
   await clickWorld(page, 1000, 600); // blur
   await sleep(page, 300);
   let segs = (await shapeTexts(page))[0].segs;
-  eq(segs.map((s) => [s.t, s.fill]), [['hello world ', '#ff0000'], ['foo', null]], 'partial color on selection only');
+  // where the trailing space of a word-selection lands in a run boundary differs
+  // across platforms, so compare colored/uncolored text with whitespace stripped
+  const colored = segs.filter((s) => s.fill === '#ff0000').map((s) => s.t).join('').replace(/\s+/g, '');
+  const plain = segs.filter((s) => !s.fill).map((s) => s.t).join('').replace(/\s+/g, '');
+  eq(colored, 'helloworld', 'partial color on selection only');
+  eq(plain, 'foo', 'rest of text uncolored');
   // whole-text color: collapse selection, pick green -> all runs lose their own color
   await dblclickWorld(page, 440, 315);
   await sleep(page, 300);

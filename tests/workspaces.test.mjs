@@ -170,15 +170,17 @@ test('workspaces: delete buttons use an in-page HTML dialog, not window.confirm'
   await page.click('#confirm-cancel');
   await page.waitForFunction(() => !document.getElementById('confirm-dialog').open);
   eq((await wsApi(`/api/workspaces/${ws}/boards`)).length, 1, 'board kept after cancel');
+  // close the board page before deleting: while its websocket is alive it can
+  // reconnect after the delete and re-create the board ("using is creating")
+  await bp.page.close();
   // confirm deletes the board
   await page.click('#dash-list .room-row .room-del');
   await page.waitForSelector('#confirm-dialog[open]');
   await page.click('#confirm-ok');
   await page.waitForFunction(() => !document.querySelector('#dash-list .room-row'));
   eq((await wsApi(`/api/workspaces/${ws}/boards`)).length, 0, 'board deleted after confirm');
-  // close the pages that would re-create the workspace via their 5s "using is creating" POST
+  // close the workspace page so its 5s "using is creating" POST can't re-create the workspace
   await page.close();
-  await bp.page.close();
   await new Promise((r) => setTimeout(r, 300));
   // workspace delete from the index page
   const idx = await openPage('/');

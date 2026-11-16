@@ -230,6 +230,8 @@ function listBoards(wsId) {
 function deleteRoom(name) {
   const room = rooms.get(name);
   if (room) {
+    // cancel a pending persist: it would re-create the board file after deletion
+    if (room.timer) { clearTimeout(room.timer); room.timer = null; }
     for (const conn of room.conns) { try { conn.terminate(); } catch {} }
     rooms.delete(name);
   }
@@ -285,7 +287,8 @@ function handleConnection(ws, room) {
   const close = () => {
     room.conns.delete(ws);
     awarenessProtocol.removeAwarenessStates(room.doc.awareness, [ws], 'disconnect');
-    if (room.conns.size === 0) schedulePersist(room);
+    // rooms.get check: deleteRoom already removed deleted rooms; don't resurrect them
+    if (room.conns.size === 0 && rooms.get(room.name) === room) schedulePersist(room);
   };
   ws.on('close', close);
   ws.on('error', close);
