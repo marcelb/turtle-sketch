@@ -34,17 +34,17 @@ jobs:
           set -e
           VER=$(node -p "require('./package.json').version")
           SHA7=${GITHUB_SHA::7}
-          # every build gets version+commit (unique per commit); main also floats 'snapshot'.
-          # Releases (vX.Y.Z + latest) are cut by the manual 'release' workflow, not by tags.
-          TAGS="v$VER-$SHA7"
-          if [ "$GITHUB_REF" = "refs/heads/main" ]; then TAGS="$TAGS snapshot"; fi
-          ARGS="--build-arg APP_VERSION=$VER --build-arg VCS_REF=$GITHUB_SHA"
-          for t in $TAGS; do ARGS="$ARGS -t $IMAGE:$t"; done
+          # the version+commit tag is local-only (used by the smoke test); published tags
+          # are floating only: 'snapshot' on main pushes. Releases (vX.Y.Z + latest) are
+          # cut by the 'release' workflow, not by push tags.
+          LOCAL_TAG="v$VER-$SHA7"
+          ARGS="--build-arg APP_VERSION=$VER --build-arg VCS_REF=$GITHUB_SHA -t $IMAGE:$LOCAL_TAG"
           DOCKER_BUILDKIT=1 docker build $ARGS .
-          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
-            for t in $TAGS; do docker push "$IMAGE:$t"; done
+          if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$GITHUB_REF" = "refs/heads/main" ]; then
+            docker tag "$IMAGE:$LOCAL_TAG" "$IMAGE:snapshot"
+            docker push "$IMAGE:snapshot"
           fi
-          echo "SMOKE_IMAGE=$IMAGE:v$VER-$SHA7" >> "$GITHUB_ENV"
+          echo "SMOKE_IMAGE=$IMAGE:$LOCAL_TAG" >> "$GITHUB_ENV"
 
       - name: Smoke test the image
         run: |
