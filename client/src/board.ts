@@ -206,7 +206,10 @@ function splitLines(runs: TextRun[], baseFs: number, baseBold: boolean, baseItal
   let cur: (LineSeg & { ri: number })[] = [];
   let curW = 0;
   const pushLine = () => {
-    lines.push({ segs: cur.map(({ ri, ...seg }) => seg), lineH: Math.max(baseFs, ...cur.map((x) => x.s)) * 1.3 });
+    // trailing whitespace hangs at the wrap point (like CSS pre-wrap): don't render/count it
+    const last = cur[cur.length - 1];
+    if (last) last.t = last.t.replace(/\s+$/, '');
+    lines.push({ segs: cur.map(({ ri, ...seg }) => seg).filter((s) => s.t !== ''), lineH: Math.max(baseFs, ...cur.map((x) => x.s)) * 1.3 });
     cur = [];
     curW = 0;
   };
@@ -225,7 +228,9 @@ function splitLines(runs: TextRun[], baseFs: number, baseBold: boolean, baseItal
       if (cur.length && curW + widthOf(tk.t, tk.s, tk.b, tk.i) <= maxW) append(tk);
       continue;
     }
-    if (curW + widthOf(tk.t, tk.s, tk.b, tk.i) <= maxW) { append(tk); continue; }
+    // fit check ignores the token's trailing space — CSS lets it hang at the wrap point,
+    // so the DOM editor keeps a word that this wrapper must not push to the next line
+    if (curW + widthOf(tk.t.replace(/\s+$/, ''), tk.s, tk.b, tk.i) <= maxW) { append(tk); continue; }
     if (cur.length) pushLine(); // word doesn't fit the rest of the line: wrap whole to next line
     const word = tk.t.replace(/\s+$/, '');
     if (widthOf(word, tk.s, tk.b, tk.i) > maxW) {
@@ -1389,7 +1394,7 @@ function enterEdit(id: string): void {
   div.spellcheck = false;
   div.style.cssText =
     // line-height 1.3 matches the SVG renderer so text does not hop when entering edit mode
-    `width:100%;font-size:${fs}px;line-height:1.3;font-family:system-ui,sans-serif;white-space:pre-wrap;` +
+    `width:100%;font-size:${fs}px;line-height:1.3;font-family:'Inter',system-ui,sans-serif;white-space:pre-wrap;` +
     `overflow:hidden;outline:none;text-align:${effAlignOf(s)};` +
     `color:${isFrame ? '#55607a' : textColorOf(s)};font-weight:${isFrame ? 600 : s.bold ? 700 : 400};font-style:${isFrame || !(s.italic ?? false) ? 'normal' : 'italic'};`;
   if (isFrame) div.textContent = editingOriginal;
@@ -2761,7 +2766,7 @@ export function downloadSvg(): void {
   c.setAttribute('height', String(h));
   c.setAttribute('style', 'background:#fafafb');
   // the on-screen text inherits the body font via CSS; the standalone file has no CSS, so pin it
-  c.setAttribute('font-family', 'system-ui, sans-serif');
+  c.setAttribute('font-family', "'Inter', system-ui, sans-serif");
   const data = new XMLSerializer().serializeToString(c);
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([data], { type: 'image/svg+xml' }));

@@ -153,7 +153,7 @@ test('tools: Download button (between name input and Home) exports the whiteboar
   const fs = await import('node:fs');
   const content = fs.readFileSync(await download.path(), 'utf8');
   assert(content.includes('<svg') && content.includes('viewBox'), 'standalone svg with viewBox');
-  assert(content.includes('font-family="system-ui, sans-serif"'), 'exported svg pins the UI font so text does not fall back to serif');
+  assert(content.includes('font-family="\'Inter\', system-ui, sans-serif"'), 'exported svg pins the bundled font so text does not fall back to serif');
   assert(content.includes('<rect') && content.includes('<path'), 'shapes and connector exported');
   assert(!content.includes('id="selection"') && !content.includes('id="overlay"'), 'selection/overlay excluded');
   assert(!content.includes('stroke="transparent"'), 'invisible hit paths excluded');

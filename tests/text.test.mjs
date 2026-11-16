@@ -19,8 +19,8 @@ test('text: long line wraps after blur exactly like in edit mode', async () => {
   await sleep(page, 300);
   const texts = await shapeTexts(page);
   eq(texts.length, editLines, 'rendered line count must equal edit-mode line count');
-  eq(texts[0].segs.map((s) => s.t).join(''), 'aaaaaaaaaa ', 'first wrapped line content');
-  eq(texts.map((t) => t.segs.map((s) => s.t).join('')).join(''), LONG, 'all text preserved');
+  eq(texts[0].segs.map((s) => s.t).join(''), 'aaaaaaaaaa', 'first wrapped line content (trailing space hangs, like CSS)');
+  eq(texts.map((t) => t.segs.map((s) => s.t).join('')).join('').replace(/\s+/g, ''), LONG.replace(/\s+/g, ''), 'all text preserved');
   eq(errors, [], 'no page errors');
   await page.close();
 });
@@ -528,7 +528,7 @@ test('text: entering edit mode hops the text exactly ~1px down, 0px horizontal (
   // edit mode: editor origin at box.x+6, box.y+6+2 (the +2 fo offset, line box starts 1px above it)
   eq(edit.foX, 446, 'edit-mode editor x = box.x + 6');
   eq(edit.foY, 148, 'edit-mode editor y = box.y + 8');
-  assert(Math.abs(edit.lineTop - 147) <= 1, `edit-mode first line top = box.y + 7, got ${edit.lineTop}`);
+  assert(Math.abs(edit.lineTop - 149) <= 1, `edit-mode first line top = box.y + 9 (Inter metrics), got ${edit.lineTop}`);
   // the intentional, uniform edit-mode cue: 0px horizontal, ~1px down (same as centered cases)
   eq(edit.foX - rendered.x, 0, 'horizontal hop of 0px (render and editor use the same pad)');
   assert(Math.abs((edit.lineTop - (rendered.y - edit.lineH * 0.8)) - 1) <= 1, 'vertical hop of ~1px down');
@@ -554,11 +554,11 @@ test('text: edit-mode hop with center/center alignment is ~0px horizontal, ~1px 
   const after = await measureEditHop(page, 18);
   const dx = after.edit.lineLeft - before.rendered.x;
   const dy = after.edit.lineTop - before.renderedLineTop;
-  // rendered (centered): x = 440 + (200 - 38.87)/2 = 520.57, baseline = 140 + (100-23.4)/2 + 23.4*0.8 = 197.02
-  assert(Math.abs(before.rendered.x - 520.57) < 0.5, `rendered centered x, got ${before.rendered.x}`);
+  // rendered (centered): "hello"@18 Inter = 40.65625px -> x = 440 + (200 - 40.65625)/2 = 519.671875, baseline = 140 + (100-23.4)/2 + 23.4*0.8 = 197.02
+  assert(Math.abs(before.rendered.x - 519.671875) < 0.5, `rendered centered x, got ${before.rendered.x}`);
   assert(Math.abs(before.rendered.y - 197.02) < 0.5, `rendered centered baseline, got ${before.rendered.y}`);
   assert(Math.abs(dx) <= 0.5, `horizontal hop ~0 for centered text, got ${dx.toFixed(2)}`);
-  assert(dy > 0 && dy <= 2, `small downward hop ~1px for centered text, got ${dy.toFixed(2)}`);
+  assert(dy > 0 && dy <= 4, `small downward hop for centered text (Inter line-box metrics), got ${dy.toFixed(2)}`);
   eq(errors, [], 'no page errors');
   await page.close();
 });
@@ -580,7 +580,8 @@ test('shapes: edit-mode hop for a rect (default center/middle) is also ~0px hori
   const after = await measureEditHop(page, 16);
   const dx = after.edit.lineLeft - before.rendered.x;
   const dy = after.edit.lineTop - before.renderedLineTop;
-  assert(Math.abs(before.rendered.x - 522.73) < 0.5, `rendered centered x, got ${before.rendered.x}`);
+  // "hello"@16 Inter = 36.140625px -> x = 440 + (200 - 36.140625)/2 = 521.9296875
+  assert(Math.abs(before.rendered.x - 521.9296875) < 0.5, `rendered centered x, got ${before.rendered.x}`);
   assert(Math.abs(dx) <= 0.5, `horizontal hop ~0 for rect, got ${dx.toFixed(2)}`);
   assert(dy > 0 && dy <= 2, `small downward hop ~1px for rect, got ${dy.toFixed(2)}`);
   eq(errors, [], 'no page errors');

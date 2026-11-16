@@ -62,16 +62,16 @@ jobs:
           if [ "$ok" != 1 ]; then echo 'smoke test failed'; docker logs ts-smoke; exit 1; fi
 
   test:
+    # the app bundles its font (client/public/fonts), so rendering is identical
+    # on any runner OS — ubuntu's preinstalled Chrome is fine
     runs-on: ubuntu-latest
-    # same base as the Forgejo build container: pinned Debian chromium, so the
-    # pixel-sensitive text tests see the same browser/fonts as on Forgejo
-    container:
-      image: node:22-bookworm
     steps:
       - uses: actions/checkout@v6
-      - name: Install chromium
-        run: apt-get update && apt-get install -y --no-install-recommends chromium && rm -rf /var/lib/apt/lists/*
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
       - run: npm ci
       - run: npm test
         env:
-          CHROME_PATH: /usr/bin/chromium
+          CHROME_PATH: /usr/bin/google-chrome
